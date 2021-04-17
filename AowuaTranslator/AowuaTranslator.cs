@@ -14,9 +14,11 @@ namespace Aowua
         {
             return string.Create(4 + 8 * text.Length, text, static (span, text) =>
             {
-                span[0] = _Aowua[3];
-                span[1] = _Aowua[1];
-                span[2] = _Aowua[0];
+                ref char first = ref MemoryMarshal.GetReference(span);
+                ref char aowuaFirst = ref MemoryMarshal.GetReference(_Aowua);
+                first = _Aowua[3];
+                Unsafe.Add(ref first, 1) = _Aowua[1];
+                Unsafe.Add(ref first, 2) = _Aowua[0];
                 int offset = 0, spanOffset = 2;
                 ReadOnlySpan<char> textSpan = text;
                 for (int i = 0; i < textSpan.Length; i++)
@@ -25,11 +27,11 @@ namespace Aowua
                     for (int b = 12; b >= 0; b -= 4)
                     {
                         int hex = (c >> b) + offset++ & 15;
-                        span[++spanOffset] = _Aowua[(int)((uint)hex >> 2)];
-                        span[++spanOffset] = _Aowua[hex & 3];
+                        Unsafe.Add(ref first, ++spanOffset) = Unsafe.Add(ref aowuaFirst, (int)((uint)hex >> 2));
+                        Unsafe.Add(ref first, ++spanOffset) = Unsafe.Add(ref aowuaFirst, hex & 3);
                     }
                 }
-                span[^1] = _Aowua[2];
+                Unsafe.Add(ref first, span.Length - 1) = _Aowua[2];
             });
         }
         
