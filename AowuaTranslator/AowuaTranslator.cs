@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Aowua
 {
@@ -8,74 +6,80 @@ namespace Aowua
     {
         private const string INVALIDINPUTMESSAGE = "~呜嗷啊嗷嗷嗷~~~嗷啊嗷嗷~啊嗷嗷呜~呜啊啊嗷呜啊嗷呜呜呜嗷~呜嗷啊呜呜呜呜呜嗷~~啊嗷嗷~呜啊呜嗷~啊啊啊呜啊~呜嗷呜嗷啊~呜呜啊啊";
 
-        private static ReadOnlySpan<char> _Aowua => "嗷呜啊~";
+        private static ReadOnlySpan<char> Aowua => "嗷呜啊~";
 
-        public static string Convert(string text)
+        public static unsafe string Convert(string text)
         {
             return string.Create(4 + 8 * text.Length, text, static (span, text) =>
             {
-                ref char first = ref MemoryMarshal.GetReference(span);
-                ref char aowuaFirst = ref MemoryMarshal.GetReference(_Aowua);
-                first = _Aowua[3];
-                Unsafe.Add(ref first, 1) = _Aowua[1];
-                Unsafe.Add(ref first, 2) = _Aowua[0];
-                int offset = 0, spanOffset = 2;
-                ReadOnlySpan<char> textSpan = text;
-                for (int i = 0; i < textSpan.Length; i++)
+                fixed (char* span1stPtr = span)
+                fixed (char* aowuaPtr = Aowua)
+                fixed (char* textPtr = text)
                 {
-                    ushort c = textSpan[i];
-                    for (int b = 12; b >= 0; b -= 4)
+                    char* spanPtr = span1stPtr;
+                    *spanPtr++ = aowuaPtr[3];
+                    *spanPtr++ = aowuaPtr[1];
+                    *spanPtr++ = *aowuaPtr;
+                    int offset = 0;
+                    for (int i = 0; i < text.Length; i++)
                     {
-                        int hex = (c >> b) + offset++ & 15;
-                        Unsafe.Add(ref first, ++spanOffset) = Unsafe.Add(ref aowuaFirst, (int)((uint)hex >> 2));
-                        Unsafe.Add(ref first, ++spanOffset) = Unsafe.Add(ref aowuaFirst, hex & 3);
+                        ushort c = textPtr[i];
+                        for (int b = 12; b >= 0; b -= 4)
+                        {
+                            int hex = (c >> b) + offset++ & 15;
+                            *spanPtr++ = aowuaPtr[(uint)hex >> 2];
+                            *spanPtr++ = aowuaPtr[hex & 3];
+                        }
                     }
+                    *spanPtr++ = aowuaPtr[2];
                 }
-                Unsafe.Add(ref first, span.Length - 1) = _Aowua[2];
             });
         }
         
-        public static string ConvertBack(string aowua)
+        public static unsafe string ConvertBack(string aowua)
         {
             int length = aowua.Length - 4;
-            ReadOnlySpan<char> span = aowua;
-            ref char first = ref MemoryMarshal.GetReference(span);
-            if (aowua.Length < 4 ||
+            fixed (char* aowuaPtr = aowua)
+            {
+                if (aowua.Length < 4 ||
                 length % 8 != 0 ||
-                Unsafe.Add(ref first, aowua.Length - 1) != '啊' ||
-                first != '~' ||
-                Unsafe.Add(ref first, 1) != '呜' ||
-                Unsafe.Add(ref first, 2) != '嗷')
-            {
-                throw new ArgumentException(INVALIDINPUTMESSAGE);
-            }
-            return string.Create(length / 8, aowua, static (span, aowua) =>
-            {
-                static uint mapChar(char aowua)
+                aowuaPtr[aowua.Length - 1] != '啊' ||
+                *aowuaPtr != '~' ||
+                aowuaPtr[1] != '呜' ||
+                aowuaPtr[2] != '嗷')
                 {
-                    return aowua switch
-                    {
-                        '嗷' => 0,
-                        '呜' => 1,
-                        '啊' => 2,
-                        '~' => 3,
-                        _ => throw new ArgumentException(INVALIDINPUTMESSAGE)
-                    };
+                    throw new ArgumentException(INVALIDINPUTMESSAGE);
                 }
-                ref char current = ref MemoryMarshal.GetReference(span);
-                ref char aowuaSpanFirst = ref Unsafe.AsRef(in aowua.GetPinnableReference());
-                uint offset = 0;
-                for (int i = 3; i < aowua.Length - 1; )
+                return string.Create(length / 8, aowua, static (span, aowua) =>
                 {
-                    uint code = 0;
-                    for (int b = i + 8; i < b; i++)
+                    static uint mapChar(char aowua)
                     {
-                        code = code << 4 | ((mapChar(Unsafe.Add(ref aowuaSpanFirst, i)) << 2 | mapChar(Unsafe.Add(ref aowuaSpanFirst, ++i))) + offset--) & 15;
+                        return aowua switch
+                        {
+                            '嗷' => 0,
+                            '呜' => 1,
+                            '啊' => 2,
+                            '~' => 3,
+                            _ => throw new ArgumentException(INVALIDINPUTMESSAGE)
+                        };
                     }
-                    current = (char)code;
-                    current = ref Unsafe.Add(ref current, 1);
-                }
-            });
+                    fixed (char* current1stPtr = span)
+                    fixed (char* aowuaPtr = aowua)
+                    {
+                        char* currentPtr = current1stPtr;
+                        uint offset = 0;
+                        for (int i = 3; i < aowua.Length - 1;)
+                        {
+                            uint code = 0;
+                            for (int j = 0; j < 4; j++)
+                            {
+                                code = code << 4 | ((mapChar(aowuaPtr[i++]) << 2 | mapChar(aowuaPtr[i++])) + offset--) & 15;
+                            }
+                            *currentPtr++ = (char)code;
+                        }
+                    }
+                });
+            }
         }
     }
 }
